@@ -2910,6 +2910,35 @@ local function layoutFrame(cfg, unit)
 	syncTextFrameLevels(st)
 end
 
+local function positionOverAbsorbGlow(st, healthDir)
+    local g = st and st.overAbsorbGlow
+    local h = st and st.health
+    if not g or not h then return end
+
+    g:ClearAllPoints()
+
+    -- Make the glow a fixed width so it doesn't "span" oddly.
+    -- Height will be implied by TOP/BOTTOM points.
+    if g.SetWidth then g:SetWidth(16) end
+
+    if healthDir == "RTL" then
+        -- Anchor at the LEFT end of the health bar
+        g:SetPoint("TOPRIGHT", h, "TOPLEFT", 7, 0)
+        g:SetPoint("BOTTOMRIGHT", h, "BOTTOMLEFT", 7, 0)
+
+        -- Flip horizontally
+        g:SetTexCoord(1, 0, 0, 1)
+    else
+        -- Anchor at the RIGHT end of the health bar
+        g:SetPoint("TOPLEFT", h, "TOPRIGHT", -7, 0)
+        g:SetPoint("BOTTOMLEFT", h, "BOTTOMRIGHT", -7, 0)
+
+        -- Normal orientation
+        g:SetTexCoord(0, 1, 0, 1)
+    end
+end
+
+
 local function ensureFrames(unit)
 	local info = UNITS[unit]
 	if not info then return end
@@ -3055,7 +3084,7 @@ local function applyBars(cfg, unit)
 	local hc = cfg.health or {}
 	local healthDir = hc.fillDirection or "LTR"
 	if st.health.SetReverseFill then
-		st.health:SetReverseFill(helathDir == "RTL")
+		st.health:SetReverseFill(healthDir == "RTL")
 	end
 	local pcfg = cfg.power or {}
 	local powerEnabled = pcfg.enabled ~= false
@@ -3087,9 +3116,8 @@ local function applyBars(cfg, unit)
 		st.absorb:SetMinMaxValues(0, 1)
 		st.absorb:SetValue(0)
 		if st.overAbsorbGlow then
-			st.overAbsorbGlow:ClearAllPoints()
-			st.overAbsorbGlow:SetPoint("TOPLEFT", st.health, "TOPRIGHT", -7, 0)
-			st.overAbsorbGlow:SetPoint("BOTTOMLEFT", st.health, "BOTTOMRIGHT", -7, 0)
+    		positionOverAbsorbGlow(st, healthDir)
+    		st.overAbsorbGlow:Hide()
 		end
 		if st.overAbsorbGlow then st.overAbsorbGlow:Hide() end
 	elseif st.overAbsorbGlow then
