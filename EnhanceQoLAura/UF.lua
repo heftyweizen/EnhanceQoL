@@ -211,6 +211,7 @@ local defaults = {
 			useShortNumbers = true,
 			hidePercentSymbol = false,
 			texture = "DEFAULT",
+			fillDirection = "LTR",
 		},
 		power = {
 			enabled = true,
