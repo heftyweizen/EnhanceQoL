@@ -3052,6 +3052,10 @@ local function applyBars(cfg, unit)
 	local info = UNITS[unit]
 	local allowAbsorb = not (info and info.disableAbsorb)
 	local hc = cfg.health or {}
+	local healthDir = hc.fillDirection or "LTR"
+	if st.health.SetReverseFill then
+		st.health:SetReverseFill(helathDir == "RTL")
+	end
 	local pcfg = cfg.power or {}
 	local powerEnabled = pcfg.enabled ~= false
 	st.health:SetStatusBarTexture(UFHelper.resolveTexture(hc.texture))
