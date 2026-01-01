@@ -91,11 +91,7 @@ local classResourceClasses = {
 	WARLOCK = true,
 }
 
-local bossUnitLookup = { boss = true }
-for i = 1, (MAX_BOSS_FRAMES or 5) do
-	bossUnitLookup["boss" .. i] = true
-end
-local function isBossUnit(unit) return type(unit) == "string" and bossUnitLookup[unit] == true end
+local function isBossUnit(unit) return unit == "boss" or (unit and unit:match("^boss%d+$")) end
 
 local function defaultsFor(unit)
 	if UF.GetDefaults then
@@ -429,6 +425,13 @@ local function borderOptions()
 	end
 	table.sort(list, function(a, b) return tostring(a.label) < tostring(b.label) end)
 	return list
+end
+
+local function fillDirectionOptions()
+	return {
+		{ value = "LTR", label = L["Left to Right"] or "Left to Right" },
+		{ value = "RTL", label = L["Right to Left"] or "Right to Left" },
+	}
 end
 
 local function radioDropdown(name, options, getter, setter, default, parentId)
@@ -1145,6 +1148,21 @@ local function buildUnitSettings(unit)
 		colorDefault = { r = 0, g = 0, b = 0, a = 0.6 },
 	})
 
+	local dirOpts = fillDirectionOptions
+	list[#list + 1] = checkboxDropdown(
+		L["Health Fill Direction"] or "Health Fill Direction",
+		dirOpts,
+		function()
+			return getValue(unit, { "health", "fillDirection" }, "LTR")
+		end,
+		function(val)
+			setValue(unit, { "health", "fillDirection" }, val)
+			refresh()
+		end,
+		"LTR",
+		"health"
+	)	
+
 	if unit ~= "pet" and not isBoss then
 		list[#list + 1] = { name = L["AbsorbBar"] or "Absorb Bar", kind = settingType.Collapsible, id = "absorb", defaultCollapsed = true }
 		local absorbColorDef = healthDef.absorbColor or { 0.85, 0.95, 1, 0.7 }
@@ -1580,22 +1598,12 @@ local function buildUnitSettings(unit)
 		classOffsetX.isEnabled = isClassResourceEnabled
 		list[#list + 1] = classOffsetX
 
-		local classOffsetY = slider(
-			L["Offset Y"] or "Offset Y",
-			-OFFSET_RANGE,
-			OFFSET_RANGE,
-			1,
-			function() return getValue(unit, { "classResource", "offset", "y" }, defaultOffsetY()) end,
-			function(val)
-				debounced(unit .. "_classResourceOffsetY", function()
-					setValue(unit, { "classResource", "offset", "y" }, val or 0)
-					refreshSelf()
-				end)
-			end,
-			defaultOffsetY(),
-			"classResource",
-			true
-		)
+		local classOffsetY = slider(L["Offset Y"] or "Offset Y", -OFFSET_RANGE, OFFSET_RANGE, 1, function() return getValue(unit, { "classResource", "offset", "y" }, defaultOffsetY()) end, function(val)
+			debounced(unit .. "_classResourceOffsetY", function()
+				setValue(unit, { "classResource", "offset", "y" }, val or 0)
+				refreshSelf()
+			end)
+		end, defaultOffsetY(), "classResource", true)
 		classOffsetY.isEnabled = isClassResourceEnabled
 		list[#list + 1] = classOffsetY
 
@@ -1729,6 +1737,8 @@ local function buildUnitSettings(unit)
 		local anchorOpts = {
 			{ value = "TOP", label = L["Top"] or "Top" },
 			{ value = "BOTTOM", label = L["Bottom"] or "Bottom" },
+			{ value = "LEFT", label = HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_LEFT or "Left" },
+			{ value = "RIGHT", label = HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_RIGHT or "Right" },
 		}
 		local castAnchor = radioDropdown(L["Anchor"] or "Anchor", anchorOpts, function() return getValue(unit, { "cast", "anchor" }, castDef.anchor or "BOTTOM") end, function(val)
 			setValue(unit, { "cast", "anchor" }, val or "BOTTOM")
@@ -1737,37 +1747,17 @@ local function buildUnitSettings(unit)
 		castAnchor.isEnabled = isCastEnabled
 		list[#list + 1] = castAnchor
 
-		local castOffsetX = slider(
-			L["Offset X"] or "Offset X",
-			-OFFSET_RANGE,
-			OFFSET_RANGE,
-			1,
-			function() return getValue(unit, { "cast", "offset", "x" }, (castDef.offset and castDef.offset.x) or 0) end,
-			function(val)
-				setValue(unit, { "cast", "offset", "x" }, val or 0)
-				refresh()
-			end,
-			(castDef.offset and castDef.offset.x) or 0,
-			"cast",
-			true
-		)
+		local castOffsetX = slider(L["Offset X"] or "Offset X", -OFFSET_RANGE, OFFSET_RANGE, 1, function() return getValue(unit, { "cast", "offset", "x" }, (castDef.offset and castDef.offset.x) or 0) end, function(val)
+			setValue(unit, { "cast", "offset", "x" }, val or 0)
+			refresh()
+		end, (castDef.offset and castDef.offset.x) or 0, "cast", true)
 		castOffsetX.isEnabled = isCastEnabled
 		list[#list + 1] = castOffsetX
 
-		local castOffsetY = slider(
-			L["Offset Y"] or "Offset Y",
-			-OFFSET_RANGE,
-			OFFSET_RANGE,
-			1,
-			function() return getValue(unit, { "cast", "offset", "y" }, (castDef.offset and castDef.offset.y) or 0) end,
-			function(val)
-				setValue(unit, { "cast", "offset", "y" }, val or 0)
-				refresh()
-			end,
-			(castDef.offset and castDef.offset.y) or 0,
-			"cast",
-			true
-		)
+		local castOffsetY = slider(L["Offset Y"] or "Offset Y", -OFFSET_RANGE, OFFSET_RANGE, 1, function() return getValue(unit, { "cast", "offset", "y" }, (castDef.offset and castDef.offset.y) or 0) end, function(val)
+			setValue(unit, { "cast", "offset", "y" }, val or 0)
+			refresh()
+		end, (castDef.offset and castDef.offset.y) or 0, "cast", true)
 		castOffsetY.isEnabled = isCastEnabled
 		list[#list + 1] = castOffsetY
 
@@ -2252,72 +2242,6 @@ local function buildUnitSettings(unit)
 	list[#list + 1] = unitStatusOffsetY
 
 	if unit == "player" then
-		local function isGroupEnabled() return isUnitStatusEnabled() and getValue(unit, { "status", "unitStatus", "showGroup" }, usDef.showGroup == true) == true end
-
-		list[#list + 1] = checkbox(
-			L["UFUnitStatusShowGroup"] or "Show group number",
-			function() return getValue(unit, { "status", "unitStatus", "showGroup" }, usDef.showGroup == true) == true end,
-			function(val)
-				setValue(unit, { "status", "unitStatus", "showGroup" }, val and true or false)
-				refresh()
-			end,
-			usDef.showGroup == true,
-			"unitStatus"
-		)
-		list[#list].isEnabled = isUnitStatusEnabled
-
-		list[#list + 1] = slider(
-			L["UFUnitStatusGroupSize"] or "Group number size",
-			8,
-			30,
-			1,
-			function() return getValue(unit, { "status", "unitStatus", "groupFontSize" }, usDef.groupFontSize or statusDef.fontSize or 14) end,
-			function(val)
-				setValue(unit, { "status", "unitStatus", "groupFontSize" }, val or statusDef.fontSize or 14)
-				refresh()
-			end,
-			usDef.groupFontSize or statusDef.fontSize or 14,
-			"unitStatus",
-			true
-		)
-		list[#list].isEnabled = isGroupEnabled
-
-		list[#list + 1] = slider(
-			L["UFUnitStatusGroupOffsetX"] or "Group number X offset",
-			-OFFSET_RANGE,
-			OFFSET_RANGE,
-			1,
-			function() return getValue(unit, { "status", "unitStatus", "groupOffset", "x" }, (usDef.groupOffset and usDef.groupOffset.x) or 0) end,
-			function(val)
-				local off = getValue(unit, { "status", "unitStatus", "groupOffset" }, { x = 0, y = 0 }) or {}
-				off.x = val or 0
-				setValue(unit, { "status", "unitStatus", "groupOffset" }, off)
-				refresh()
-			end,
-			(usDef.groupOffset and usDef.groupOffset.x) or 0,
-			"unitStatus",
-			true
-		)
-		list[#list].isEnabled = isGroupEnabled
-
-		list[#list + 1] = slider(
-			L["UFUnitStatusGroupOffsetY"] or "Group number Y offset",
-			-OFFSET_RANGE,
-			OFFSET_RANGE,
-			1,
-			function() return getValue(unit, { "status", "unitStatus", "groupOffset", "y" }, (usDef.groupOffset and usDef.groupOffset.y) or 0) end,
-			function(val)
-				local off = getValue(unit, { "status", "unitStatus", "groupOffset" }, { x = 0, y = 0 }) or {}
-				off.y = val or 0
-				setValue(unit, { "status", "unitStatus", "groupOffset" }, off)
-				refresh()
-			end,
-			(usDef.groupOffset and usDef.groupOffset.y) or 0,
-			"unitStatus",
-			true
-		)
-		list[#list].isEnabled = isGroupEnabled
-
 		local restDef = def.resting or {}
 		local function isRestEnabled() return getValue(unit, { "resting", "enabled" }, restDef.enabled ~= false) ~= false end
 
@@ -2443,9 +2367,9 @@ local function buildUnitSettings(unit)
 		list[#list + 1] = combatIndicatorOffsetY
 	end
 
-	if unit == "player" or unit == "target" or isBossUnit(unit) then
+	if unit == "target" then
 		list[#list + 1] = { name = L["Auras"] or "Auras", kind = settingType.Collapsible, id = "auras", defaultCollapsed = true }
-		local auraDef = def.auraIcons or { enabled = true, size = 24, padding = 2, max = 16, showCooldown = true }
+		local auraDef = def.auraIcons or { size = 24, padding = 2, max = 16, showCooldown = true }
 		local function debuffAnchorValue() return getValue(unit, { "auraIcons", "debuffAnchor" }, getValue(unit, { "auraIcons", "anchor" }, auraDef.debuffAnchor or auraDef.anchor or "BOTTOM")) end
 		local function defaultAuraOffset(anchor)
 			if anchor == "TOP" then return 0, 5 end
@@ -2462,42 +2386,21 @@ local function buildUnitSettings(unit)
 			return y
 		end
 		local function debuffOffsetYDefault() return defaultAuraOffsetY(debuffAnchorValue()) end
-		local function isAuraEnabled() return getValue(unit, { "auraIcons", "enabled" }, auraDef.enabled ~= false) ~= false end
-		local function refreshAuras()
-			if not (UF and UF.FullScanTargetAuras) then return end
-			if unit == "boss" then
-				for i = 1, (MAX_BOSS_FRAMES or 5) do
-					UF.FullScanTargetAuras("boss" .. i)
-				end
-			else
-				UF.FullScanTargetAuras(unit)
-			end
-		end
-
-		list[#list + 1] = checkbox(L["UFAurasEnabled"] or "Enable auras", isAuraEnabled, function(val)
-			setValue(unit, { "auraIcons", "enabled" }, val and true or false)
-			refresh()
-			refreshSettingsUI()
-			refreshAuras()
-		end, auraDef.enabled ~= false, "auras")
 
 		list[#list + 1] = slider(L["Aura size"] or "Aura size", 12, 48, 1, function() return getValue(unit, { "auraIcons", "size" }, auraDef.size or 24) end, function(val)
 			setValue(unit, { "auraIcons", "size" }, val or auraDef.size or 24)
 			refresh()
 		end, auraDef.size or 24, "auras", true)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(L["Aura spacing"] or "Aura spacing", 0, 10, 1, function() return getValue(unit, { "auraIcons", "padding" }, auraDef.padding or 2) end, function(val)
 			setValue(unit, { "auraIcons", "padding" }, val or 0)
 			refresh()
 		end, auraDef.padding or 2, "auras", true)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(L["UFMaxAuras"] or "Max auras", 4, 40, 1, function() return getValue(unit, { "auraIcons", "max" }, auraDef.max or 16) end, function(val)
 			setValue(unit, { "auraIcons", "max" }, val or auraDef.max or 16)
 			refresh()
 		end, auraDef.max or 16, "auras", true)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(
 			L["Aura per row"] or "Auras per row",
@@ -2520,19 +2423,16 @@ local function buildUnitSettings(unit)
 				return tostring(math.floor(value + 0.5))
 			end
 		)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = checkbox(L["Show cooldown text"] or "Show cooldown text", function() return getValue(unit, { "auraIcons", "showCooldown" }, auraDef.showCooldown ~= false) end, function(val)
 			setValue(unit, { "auraIcons", "showCooldown" }, val and true or false)
 			refresh()
 		end, auraDef.showCooldown ~= false, "auras")
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(L["Aura stack size"] or "Aura stack size", 8, 32, 1, function() return getValue(unit, { "auraIcons", "countFontSize" }, auraDef.countFontSize or 14) end, function(val)
 			setValue(unit, { "auraIcons", "countFontSize" }, val or 14)
 			refresh()
 		end, auraDef.countFontSize or 14, "auras", true)
-		list[#list].isEnabled = isAuraEnabled
 
 		local stackOutlineOptions = {
 			{ value = "NONE", label = L["None"] or "None" },
@@ -2551,7 +2451,6 @@ local function buildUnitSettings(unit)
 			auraDef.countFontOutline or "OUTLINE",
 			"auras"
 		)
-		list[#list].isEnabled = isAuraEnabled
 
 		local stackAnchorOptions = {
 			{ value = "TOPLEFT", label = L["Top left"] or "Top left" },
@@ -2571,7 +2470,6 @@ local function buildUnitSettings(unit)
 			auraDef.countAnchor or "BOTTOMRIGHT",
 			"auras"
 		)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(
 			L["Aura stack offset X"] or "Aura stack offset X",
@@ -2587,7 +2485,6 @@ local function buildUnitSettings(unit)
 			"auras",
 			true
 		)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(
 			L["Aura stack offset Y"] or "Aura stack offset Y",
@@ -2603,7 +2500,6 @@ local function buildUnitSettings(unit)
 			"auras",
 			true
 		)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = checkbox(L["UFHidePermanentAuras"] or "Hide permanent auras", function()
 			local val = getValue(unit, { "auraIcons", "hidePermanentAuras" })
@@ -2615,9 +2511,8 @@ local function buildUnitSettings(unit)
 			setValue(unit, { "auraIcons", "hidePermanentAuras" }, val and true or false)
 			setValue(unit, { "auraIcons", "hidePermanent" }, nil)
 			refresh()
-			refreshAuras()
+			if UF and UF.FullScanTargetAuras then UF.FullScanTargetAuras() end
 		end, (auraDef.hidePermanentAuras or auraDef.hidePermanent) == true, "auras")
-		list[#list].isEnabled = isAuraEnabled
 
 		local leftLabel = HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_LEFT or L["Left"] or "Left"
 		local rightLabel = HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_RIGHT or L["Right"] or "Right"
@@ -2631,7 +2526,6 @@ local function buildUnitSettings(unit)
 			setValue(unit, { "auraIcons", "anchor" }, val or "BOTTOM")
 			refresh()
 		end, auraDef.anchor or "BOTTOM", "auras")
-		list[#list].isEnabled = isAuraEnabled
 
 		local upLabel = HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_UP or L["Up"] or "Up"
 		local downLabel = HUD_EDIT_MODE_SETTING_BAGS_DIRECTION_DOWN or L["Down"] or "Down"
@@ -2663,7 +2557,6 @@ local function buildUnitSettings(unit)
 			defaultAuraGrowth(),
 			"auras"
 		)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(L["Aura Offset X"] or "Aura Offset X", -OFFSET_RANGE, OFFSET_RANGE, 1, function()
 			local anchor = getValue(unit, { "auraIcons", "anchor" }, auraDef.anchor or "BOTTOM")
@@ -2672,7 +2565,6 @@ local function buildUnitSettings(unit)
 			setValue(unit, { "auraIcons", "offset", "x" }, val or 0)
 			refresh()
 		end, (auraDef.offset and auraDef.offset.x) or defaultAuraOffsetX(auraDef.anchor or "BOTTOM"), "auras", true)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = slider(L["Aura Offset Y"] or "Aura Offset Y", -OFFSET_RANGE, OFFSET_RANGE, 1, function()
 			local anchor = getValue(unit, { "auraIcons", "anchor" }, auraDef.anchor or "BOTTOM")
@@ -2681,7 +2573,6 @@ local function buildUnitSettings(unit)
 			setValue(unit, { "auraIcons", "offset", "y" }, val or 0)
 			refresh()
 		end, (auraDef.offset and auraDef.offset.y) or defaultAuraOffsetY(auraDef.anchor or "BOTTOM"), "auras", true)
-		list[#list].isEnabled = isAuraEnabled
 
 		list[#list + 1] = checkbox(
 			L["UFSeparateDebuffAnchor"] or "Separate debuff anchor",
@@ -2694,9 +2585,8 @@ local function buildUnitSettings(unit)
 			auraDef.separateDebuffAnchor == true,
 			"auras"
 		)
-		list[#list].isEnabled = isAuraEnabled
 
-		local function isSeparateDebuffEnabled() return isAuraEnabled() and getValue(unit, { "auraIcons", "separateDebuffAnchor" }, auraDef.separateDebuffAnchor == true) == true end
+		local function isSeparateDebuffEnabled() return getValue(unit, { "auraIcons", "separateDebuffAnchor" }, auraDef.separateDebuffAnchor == true) == true end
 
 		local debuffAnchorSetting = radioDropdown(L["UFDebuffAnchor"] or "Debuff anchor", anchorOpts, function() return debuffAnchorValue() end, function(val)
 			setValue(unit, { "auraIcons", "debuffAnchor" }, val or nil)
